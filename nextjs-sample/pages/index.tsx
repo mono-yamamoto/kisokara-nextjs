@@ -1,5 +1,6 @@
 import { Client } from "@notionhq/client";
 import { GetStaticProps } from "next";
+import {NextPage} from 'next'
 
 const notion = new Client({
   auth: process.env.NOTION_TOKEN,
@@ -140,7 +141,8 @@ export const getStaticProps: GetStaticProps<StaticProps> = async () => {
   }
 }
 
-const Home = () => {
+const Home: NextPage<StaticProps> = ({post}) => {
+  console.log(post);
   return <div></div>;
 };
 
