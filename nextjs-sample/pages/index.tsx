@@ -168,11 +168,10 @@ export const getStaticProps: GetStaticProps<StaticProps> = async () => {
   };
 };
 
-import styles from "../styles/Home.module.css";
-import dayjs from "dayjs";
 import prism from "prismjs";
 import { useEffect } from "react";
-import Link from "next/link";
+import { Layout } from "@/lib/component/Lauout";
+import { PostComponent } from "@/lib/component/Post";
 
 const Home: NextPage<StaticProps> = ({ posts }) => {
   useEffect(() => {
@@ -180,58 +179,11 @@ const Home: NextPage<StaticProps> = ({ posts }) => {
   }, []);
 
   return (
-    <div className={styles.wrapper}>
+    <Layout>
       {posts.map((post) => (
-        <div className={styles.post1} key={post.id}>
-          <h1 className={styles.title}>
-            <Link href={`/post/${encodeURIComponent(post.slug ?? "")}`}>{post.title}</Link>
-          </h1>
-          <div className={styles.timestampWrapper}>
-            <div>
-              <div className={styles.timestamp}>作成日時: {dayjs(post.createdTs).format("YYYY-MM-DD HH:mm:ss")}</div>
-              <div className={styles.timestamp}>更新日時: {dayjs(post.lastEditedTs).format("YYYY-MM-DD HH:mm:ss")}</div>
-            </div>
-          </div>
-          <div>
-            {post.contents.map((content, index) => {
-              const key = `${post.id}_${index}`;
-              switch (content.type) {
-                case "heading_2":
-                  return (
-                    <h2 key={key} className={styles.heading2}>
-                      {content.text}
-                    </h2>
-                  );
-                case "heading_3":
-                  return (
-                    <h2 key={key} className={styles.heading3}>
-                      {content.text}
-                    </h2>
-                  );
-                case "paragraph":
-                  return (
-                    <h2 key={key} className={styles.paragraph}>
-                      {content.text}
-                    </h2>
-                  );
-                case "code":
-                  return (
-                    <pre className={`${styles.code} lang-${content.language}`}>
-                      <code>{content.text}</code>
-                    </pre>
-                  );
-                case "quote":
-                  return (
-                    <blockquote key={key} className={styles.quote}>
-                      {content.text}
-                    </blockquote>
-                  );
-              }
-            })}
-          </div>
-        </div>
+        <PostComponent post={post} key={post.id} />
       ))}
-    </div>
+    </Layout>
   );
 };
 
