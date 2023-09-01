@@ -1,6 +1,7 @@
 import { Client } from "@notionhq/client";
 import { GetStaticProps } from "next";
 import { NextPage } from "next";
+import { QueryDatabaseResponse } from "@notionhq/client/build/src/api-endpoints";
 
 const notion = new Client({
   auth: process.env.NOTION_TOKEN,
@@ -30,35 +31,46 @@ type StaticProps = {
   posts: Post[];
 };
 
-export const getStaticProps: GetStaticProps<StaticProps> = async () => {
-  const database = await notion.databases.query({
-    database_id: process.env.NOTION_DATABASE_ID || "",
-    filter: {
-      and: [
-        {
-          property: "Published",
-          checkbox: {
-            equals: true,
+export const getPosts = async (slug?: string) => {
+  let database: QueryDatabaseResponse | undefined = undefined;
+  if (slug) {
+    database = await notion.databases.query({
+      database_id: process.env.NOTION_DATABASE_ID || "",
+      filter: {
+        and: [
+          {
+            property: "Published",
+            rich_text: {
+              equals: slug,
+            },
           },
+        ],
+      },
+    });
+  } else {
+    database = await notion.databases.query({
+      database_id: process.env.NOTION_DATABASE_ID || "",
+      filter: {
+        and: [
+          {
+            property: "Published",
+            checkbox: {
+              equals: true,
+            },
+          },
+        ],
+      },
+      sorts: [
+        {
+          timestamp: "created_time",
+          direction: "descending",
         },
       ],
-    },
-    sorts: [
-      {
-        timestamp: "created_time",
-        direction: "descending",
-      },
-    ],
-  });
+    });
+  }
+  if (!database) return [];
 
   const posts: Post[] = [];
-  const blockResponses = await Promise.all(
-    database.results.map((page) => {
-      return notion.blocks.children.list({
-        block_id: page.id,
-      });
-    })
-  );
 
   database.results.forEach((page, index) => {
     if (!("properties" in page)) {
@@ -82,46 +94,6 @@ export const getStaticProps: GetStaticProps<StaticProps> = async () => {
       slug = page.properties["Slug"].rich_text[0]?.plain_text ?? null;
     }
 
-    const blocks = blockResponses[index];
-
-    const contents: Content[] = [];
-    blocks.results.forEach((block) => {
-      if (!("type" in block)) {
-        return;
-      }
-      switch (block.type) {
-        case "paragraph":
-          contents.push({
-            type: "paragraph",
-            text: block.paragraph.rich_text[0]?.plain_text ?? null,
-          });
-          break;
-        case "heading_2":
-          contents.push({
-            type: "heading_2",
-            text: block.heading_2.rich_text[0]?.plain_text ?? null,
-          });
-          break;
-        case "heading_3":
-          contents.push({
-            type: "heading_3",
-            text: block.heading_3.rich_text[0]?.plain_text ?? null,
-          });
-          break;
-        case "quote":
-          contents.push({
-            type: "quote",
-            text: block.quote.rich_text[0]?.plain_text ?? null,
-          });
-          break;
-        case "code":
-          contents.push({
-            type: "code",
-            text: block.code.rich_text[0]?.plain_text ?? null,
-            language: block.code.language,
-          });
-      }
-    });
     posts.push({
       id: page.id,
       title,
@@ -132,6 +104,65 @@ export const getStaticProps: GetStaticProps<StaticProps> = async () => {
     });
   });
 
+  return posts;
+};
+
+export const getPostContents = async (post: Post) => {
+  const blockResponse = await notion.blocks.children.list({
+    block_id: post.id,
+  });
+  const contents: Content[] = [];
+
+  blockResponse.results.forEach((block) => {
+    if (!("type" in block)) {
+      return;
+    }
+    switch (block.type) {
+      case "paragraph":
+        contents.push({
+          type: "paragraph",
+          text: block.paragraph.rich_text[0]?.plain_text ?? null,
+        });
+        break;
+      case "heading_2":
+        contents.push({
+          type: "heading_2",
+          text: block.heading_2.rich_text[0]?.plain_text ?? null,
+        });
+        break;
+      case "heading_3":
+        contents.push({
+          type: "heading_3",
+          text: block.heading_3.rich_text[0]?.plain_text ?? null,
+        });
+        break;
+      case "quote":
+        contents.push({
+          type: "quote",
+          text: block.quote.rich_text[0]?.plain_text ?? null,
+        });
+        break;
+      case "code":
+        contents.push({
+          type: "code",
+          text: block.code.rich_text[0]?.plain_text ?? null,
+          language: block.code.language,
+        });
+    }
+  });
+  return contents;
+};
+
+export const getStaticProps: GetStaticProps<StaticProps> = async () => {
+  const posts = await getPosts();
+  const contentsList = await Promise.all(
+    posts.map((post) => {
+      return getPostContents(post);
+    })
+  );
+  posts.forEach((post, index) => {
+    post.contents = contentsList[index];
+  });
   return {
     props: { posts },
   };
